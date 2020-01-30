@@ -10,8 +10,8 @@ System monitor
 import curses
 import locale
 import threading
+import time
 import psutil
-
 
 
 def init_color():
@@ -69,7 +69,13 @@ def clearwindow(stdscr):
     curses.endwin()
 
 
-def cpu_info():
+def timer(te):
+    while True:
+        te.set()
+        time.sleep(1)
+
+
+def cpu_info(win, cpu_list):
 
     _main_height, _main_width = win.getmaxyx()
 
@@ -84,12 +90,12 @@ def cpu_info():
 
     cpu_window.addstr(0, _start_x_title, _title[:_width-1], colors['Black'])
 
-    cpu_info = psutil.cpu_times_percent(percpu=True)
-    cpu_count = len(cpu_info)
+    #cpu_list = psutil.cpu_times_percent(percpu=True)
+    cpu_count = len(cpu_list)
     start_x = 1
     start_y = 1
 
-    for i, item in enumerate(cpu_info):
+    for i, item in enumerate(cpu_list):
         if start_y > cpu_count/2:
             start_x = int(_width/2)
             start_y = 1
@@ -98,41 +104,6 @@ def cpu_info():
             + ']' + str(item[0]).rjust(5) + '%'
         cpu_window.addstr(start_y+1, start_x, cpu_str, colors['White'])
         start_y += 1
-
-    cpu_window.refresh()
-
-
-def print_cpu_info():
-    """
-    Printing CPU info
-    """
-
-    _title = " CPU Info "
-
-    cpu_window = curses.newwin(12, 20, 2, 1)
-    cpu_window.border(0)
-
-    _height, _width = cpu_window.getmaxyx()
-    _start_x_title = int((_width // 2) - (len(_title) // 2) - len(_title) % 2)
-
-    cpu_window.addstr(0, _start_x_title, _title[:_width-1], colors['Black'])
-
-    col = 0
-
-    for i, item in enumerate(psutil.cpu_times_percent(percpu=True)):
-        cpu_str = 'ЦП №{} - '.format(i+1)
-        cpu_window.addstr(i+1, 1, cpu_str, colors['Magenta'])
-        cpu_window.addstr(i+1, len(cpu_str)+1, '{}%'.format(str(item[0])), colors['Cyan'])
-        col = i + 2
-
-    cpu = psutil.cpu_percent()
-
-    if cpu > float(60):
-        cpu_window.addstr(col+1, 1, 'CPU Usage: {}%'.format(cpu), colors['Red'])
-    elif cpu < float(30):
-        cpu_window.addstr(col+1, 1, 'CPU Usage: {}%'.format(cpu), colors['Green'])
-    else:
-        cpu_window.addstr(col+1, 1, 'CPU Usage: {}%'.format(cpu), colors['Yellow'])
 
     cpu_window.refresh()
 
@@ -173,15 +144,19 @@ def main():
     _key = 'x'
     _title = " System Monitor "
     _footer = "Press Q to exit"
+    cpu_list = []
 
     try:
-        global win
         global colors
 
         win = initwindow()
         colors = init_color()
-
         win.timeout(1000)
+
+        te = threading.Event()
+        cpu = threading.Thread(target=timer, args=(te,))
+        cpu.setDaemon(True)
+        cpu.start()
 
         while _key != ord('q'):
             # Calculate coordinates
@@ -195,7 +170,11 @@ def main():
 
             win.refresh()
 
-            cpu_info()
+            if te.is_set():
+                te.clear()
+                cpu_list = psutil.cpu_times_percent(percpu=True)
+
+            cpu_info(win, cpu_list)
             #print_mem_info()
 
             _key = win.getch()
