@@ -96,9 +96,19 @@ def system_info(win, params):
             start_x = int(_width/2)
             start_y = 1
         cpu_usage = item[0] or 1
-        cpu_str = str(i+1).ljust(3) + '['.ljust(round(((int(_width/2)-13)/100*cpu_usage)), '|').ljust(int(_width/2)-13)\
-            + ']' + str(item[0]).rjust(5) + '%'
-        win.addstr(start_y+1, start_x+1, cpu_str, colors['White'])
+        part1 = str(i+1).ljust(3)
+        part2 = '['.ljust(round(((int(_width/2)-13)/100*cpu_usage)), '|').ljust(int(_width/2)-13) + ']'
+        part3 = str(item[0]).rjust(5) + '%'
+        win.addstr(start_y+1, start_x+1, part1, colors['Cyan'])
+        if item[0] < float(30):
+            win.addstr(start_y+1, start_x+1+len(part1), part2, colors['White'])
+            win.addstr(start_y+1, start_x+1+len(part1+part2), part3, colors['Green'])
+        elif item[0] > float(70):
+            win.addstr(start_y+1, start_x+1+len(part1), part2, colors['Red'])
+            win.addstr(start_y+1, start_x+1+len(part1+part2), part3, colors['Red'])
+        else:
+            win.addstr(start_y+1, start_x+1+len(part1), part2, colors['Yellow'])
+            win.addstr(start_y+1, start_x+1+len(part1+part2), part3, colors['Yellow'])
         start_y += 1
 
     strings = ['CPU Usage', 'Used Mem', 'Used Swp']
@@ -106,12 +116,17 @@ def system_info(win, params):
         part1 = (item + ':').ljust(12)
         part2 = '{}%'.format(params.get(item)).rjust(7)
         win.addstr(start_y+i+2, 2, part1, colors['Cyan'])
-        win.addstr(start_y+i+2, len(part1), part2, colors['White'])
+        if params.get(item) < float(30):
+            win.addstr(start_y+i+2, len(part1), part2, colors['Green'])
+        elif params.get(item) > float(70):
+            win.addstr(start_y+i+2, len(part1), part2, colors['Red'])
+        else:
+            win.addstr(start_y+i+2, len(part1), part2, colors['Yellow'])
 
     part1 = 'Uptime: '
     part2 = params.get('Uptime')
     win.addstr(start_y+2, start_x+1, part1, colors['Cyan'])
-    win.addstr(start_y+2, start_x+len(part1), part2[:_width-len(part1)], colors['White'])
+    win.addstr(start_y+2, start_x+1+len(part1), part2[:int(_width/2)-len(part1)-2], colors['White'])
 
     win.refresh()
 
@@ -131,14 +146,20 @@ def get_uptime():
         parts.append('%d day%s ' % (days, 's' if days != 1 else ''))
 
     hours, up = int(up // 3600), up % 3600
-    if hours:
+    if hours < 10:
+        parts.append('{}:'.format('0' + str(hours)))
+    else:
         parts.append('{}:'.format(hours))
 
     minutes, up = int(up // 60), up % 60
-    if minutes:
+    if minutes < 10:
+        parts.append('{}:'.format('0' + str(minutes)))
+    else:
         parts.append('{}:'.format(minutes))
 
-    if up or not parts:
+    if up < 10:
+        parts.append('{}'.format('0' + str(int(up))))
+    else:
         parts.append('{}'.format(int(up)))
 
     return ''.join(parts)
@@ -156,7 +177,6 @@ def get_params():
         'Used Swp': psutil.swap_memory().percent,
         'Uptime': get_uptime()
     }
-
 
 
 def main():
