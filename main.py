@@ -69,9 +69,13 @@ def clearwindow(stdscr):
     curses.endwin()
 
 
-def timer(te):
+def timer(event):
+    """
+    Timer for thread
+    """
+
     while True:
-        te.set()
+        event.set()
         time.sleep(1)
 
 
@@ -80,24 +84,13 @@ def system_info(win, params):
     Window with CPU info
     """
 
-    _main_height, _main_width = win.getmaxyx()
+    _height, _width = win.getmaxyx()
 
-    _title = " CPU Info "
-
-    system_window = curses.newwin(int(_main_height/2), _main_width-2, 2, 1)
-    system_window.border(0)
-
-    _height, _width = system_window.getmaxyx()
-
-    _start_x_title = int((_width // 2) - (len(_title) // 2) - len(_title) % 2)
-
-    system_window.addstr(0, _start_x_title, _title[:_width-1], colors['Black'])
-
-    #cpu_list = psutil.cpu_times_percent(percpu=True)
     cpu_count = len(params.get('PerCPU'))
     start_x = 1
     start_y = 1
 
+    # Printing info about CPU usage
     for i, item in enumerate(params.get('PerCPU')):
         if start_y > cpu_count/2:
             start_x = int(_width/2)
@@ -105,30 +98,50 @@ def system_info(win, params):
         cpu_usage = item[0] or 1
         cpu_str = str(i+1).ljust(3) + '['.ljust(round(((int(_width/2)-13)/100*cpu_usage)), '|').ljust(int(_width/2)-13)\
             + ']' + str(item[0]).rjust(5) + '%'
-        system_window.addstr(start_y+1, start_x, cpu_str, colors['White'])
+        win.addstr(start_y+1, start_x+1, cpu_str, colors['White'])
         start_y += 1
 
-    cpu_1 = 'CPU Usage:'.ljust(11)
-    cpu_2 = '{}%'.format(params.get('CPUUsage')).rjust(8)
-    system_window.addstr(start_y+2, 1, cpu_1, colors['Cyan'])
-    system_window.addstr(start_y+2, len(cpu_1), cpu_2, colors['White'])
+    strings = ['CPU Usage', 'Used Mem', 'Used Swp']
+    for i, item in enumerate(strings):
+        part1 = (item + ':').ljust(12)
+        part2 = '{}%'.format(params.get(item)).rjust(7)
+        win.addstr(start_y+i+2, 2, part1, colors['Cyan'])
+        win.addstr(start_y+i+2, len(part1), part2, colors['White'])
 
-    tmem_1 = 'Total Mem:'.ljust(11)
-    tmem_2 = '{}GB'.format(params.get('TotalMem')).rjust(8)
-    system_window.addstr(start_y+3, 1, tmem_1, colors['Cyan'])
-    system_window.addstr(start_y+3, len(tmem_1), tmem_2, colors['White'])
+    part1 = 'Uptime: '
+    part2 = params.get('Uptime')
+    win.addstr(start_y+2, start_x+1, part1, colors['Cyan'])
+    win.addstr(start_y+2, start_x+len(part1), part2[:_width-len(part1)], colors['White'])
 
-    umem_1 = 'Used Mem:'.ljust(11)
-    umem_2 = '{}%'.format(params.get('UsedMem')).rjust(8)
-    system_window.addstr(start_y+4, 1, umem_1, colors['Cyan'])
-    system_window.addstr(start_y+4, len(umem_1), umem_2, colors['White'])
+    win.refresh()
 
-    swp_1 = 'Used Swp:'.ljust(11)
-    swp_2 = '{}%'.format(params.get('UsedSwp')).rjust(8)
-    system_window.addstr(start_y+5, 1, swp_1, colors['Cyan'])
-    system_window.addstr(start_y+5, len(swp_1), swp_2, colors['White'])
 
-    system_window.refresh()
+def get_uptime():
+    """
+    Getting uptime
+    """
+
+    with open('/proc/uptime', 'r') as file:
+        up = float(file.readline().split()[0])
+
+    parts = []
+
+    days, up = int(up // 86400), up % 86400
+    if days:
+        parts.append('%d day%s ' % (days, 's' if days != 1 else ''))
+
+    hours, up = int(up // 3600), up % 3600
+    if hours:
+        parts.append('{}:'.format(hours))
+
+    minutes, up = int(up // 60), up % 60
+    if minutes:
+        parts.append('{}:'.format(minutes))
+
+    if up or not parts:
+        parts.append('{}'.format(int(up)))
+
+    return ''.join(parts)
 
 
 def get_params():
@@ -138,10 +151,10 @@ def get_params():
 
     return {
         'PerCPU': psutil.cpu_times_percent(percpu=True),
-        'CPUUsage': psutil.cpu_times_percent()[0],
-        'TotalMem': round(psutil.virtual_memory().total/1024/1024/1024, 2),
-        'UsedMem': psutil.virtual_memory().percent + 10,
-        'UsedSwp': psutil.swap_memory().percent
+        'CPU Usage': psutil.cpu_times_percent()[0],
+        'Used Mem': psutil.virtual_memory().percent + 10,
+        'Used Swp': psutil.swap_memory().percent,
+        'Uptime': get_uptime()
     }
 
 
@@ -163,28 +176,29 @@ def main():
         global colors
 
         win = initwindow()
-        colors = init_color()
         win.timeout(1000)
+        colors = init_color()
 
-        te = threading.Event()
-        cpu = threading.Thread(target=timer, args=(te,))
+        # Creating thread with timer
+        event = threading.Event()
+        cpu = threading.Thread(target=timer, args=(event,))
         cpu.setDaemon(True)
         cpu.start()
 
+        # Main cycle
         while _key != ord('q'):
-            # Calculate coordinates
-            _height, _width = win.getmaxyx()
-            _start_x_title = int((_width // 2) - (len(_title) // 2) - len(_title) % 2)
-
             win.erase()
             win.border(0)
+            # Calculate coordinates for title and footer
+            _height, _width = win.getmaxyx()
+            _start_x_title = int((_width // 2) - (len(_title) // 2) - len(_title) % 2)
             win.addstr(0, _start_x_title, _title[:_width-1], colors['Black'])
             win.addstr(_height-1, _width-len(_footer)-1, _footer[:_width-1], colors['Black'])
-
             win.refresh()
 
-            if te.is_set():
-                te.clear()
+            # Check event for getting params
+            if event.is_set():
+                event.clear()
                 params = get_params()
 
             system_info(win, params)
