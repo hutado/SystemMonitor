@@ -75,62 +75,75 @@ def timer(te):
         time.sleep(1)
 
 
-def cpu_info(win, cpu_list):
+def system_info(win, params):
+    """
+    Window with CPU info
+    """
 
     _main_height, _main_width = win.getmaxyx()
 
     _title = " CPU Info "
 
-    cpu_window = curses.newwin(int(_main_height/2), _main_width-2, 2, 1)
-    cpu_window.border(0)
+    system_window = curses.newwin(int(_main_height/2), _main_width-2, 2, 1)
+    system_window.border(0)
 
-    _height, _width = cpu_window.getmaxyx()
+    _height, _width = system_window.getmaxyx()
 
     _start_x_title = int((_width // 2) - (len(_title) // 2) - len(_title) % 2)
 
-    cpu_window.addstr(0, _start_x_title, _title[:_width-1], colors['Black'])
+    system_window.addstr(0, _start_x_title, _title[:_width-1], colors['Black'])
 
     #cpu_list = psutil.cpu_times_percent(percpu=True)
-    cpu_count = len(cpu_list)
+    cpu_count = len(params.get('PerCPU'))
     start_x = 1
     start_y = 1
 
-    for i, item in enumerate(cpu_list):
+    for i, item in enumerate(params.get('PerCPU')):
         if start_y > cpu_count/2:
             start_x = int(_width/2)
             start_y = 1
         cpu_usage = item[0] or 1
         cpu_str = str(i+1).ljust(3) + '['.ljust(round(((int(_width/2)-13)/100*cpu_usage)), '|').ljust(int(_width/2)-13)\
             + ']' + str(item[0]).rjust(5) + '%'
-        cpu_window.addstr(start_y+1, start_x, cpu_str, colors['White'])
+        system_window.addstr(start_y+1, start_x, cpu_str, colors['White'])
         start_y += 1
 
-    cpu_window.refresh()
+    cpu_1 = 'CPU Usage:'.ljust(11)
+    cpu_2 = '{}%'.format(params.get('CPUUsage')).rjust(8)
+    system_window.addstr(start_y+2, 1, cpu_1, colors['Cyan'])
+    system_window.addstr(start_y+2, len(cpu_1), cpu_2, colors['White'])
+
+    tmem_1 = 'Total Mem:'.ljust(11)
+    tmem_2 = '{}GB'.format(params.get('TotalMem')).rjust(8)
+    system_window.addstr(start_y+3, 1, tmem_1, colors['Cyan'])
+    system_window.addstr(start_y+3, len(tmem_1), tmem_2, colors['White'])
+
+    umem_1 = 'Used Mem:'.ljust(11)
+    umem_2 = '{}%'.format(params.get('UsedMem')).rjust(8)
+    system_window.addstr(start_y+4, 1, umem_1, colors['Cyan'])
+    system_window.addstr(start_y+4, len(umem_1), umem_2, colors['White'])
+
+    swp_1 = 'Used Swp:'.ljust(11)
+    swp_2 = '{}%'.format(params.get('UsedSwp')).rjust(8)
+    system_window.addstr(start_y+5, 1, swp_1, colors['Cyan'])
+    system_window.addstr(start_y+5, len(swp_1), swp_2, colors['White'])
+
+    system_window.refresh()
 
 
-def print_mem_info():
+def get_params():
     """
-    Printing Memory info
+    Returning System Info
     """
 
-    _title = " Memory Info "
+    return {
+        'PerCPU': psutil.cpu_times_percent(percpu=True),
+        'CPUUsage': psutil.cpu_times_percent()[0],
+        'TotalMem': round(psutil.virtual_memory().total/1024/1024/1024, 2),
+        'UsedMem': psutil.virtual_memory().percent + 10,
+        'UsedSwp': psutil.swap_memory().percent
+    }
 
-    mem_window = curses.newwin(12, 20, 2, 22)
-    mem_window.border(0)
-
-    _height, _width = mem_window.getmaxyx()
-    _start_x_title = int((_width // 2) - (len(_title) // 2) - len(_title) % 2)
-
-    mem_window.addstr(0, _start_x_title, _title[:_width-1], colors['Black'])
-
-    col = 0
-
-    mem_window.addstr(col+1, 1, 'Total: {}GB'.format(round(psutil.virtual_memory().total/1024/1024/1024, 2)), colors['Cyan'])
-    mem_window.addstr(col+2, 1, 'Used: {}GB'.format(round(psutil.virtual_memory().used/1024/1024/1024,2)), colors['Cyan'])
-    mem_window.addstr(col+3, 1, 'Available: {}GB'.format(round(psutil.virtual_memory().available/1024/1024/1024, 2)), colors['Cyan'])
-    mem_window.addstr(col+4, 1, 'Used: {}%'.format(psutil.virtual_memory().percent), colors['Cyan'])
-
-    mem_window.refresh()
 
 
 def main():
@@ -144,7 +157,7 @@ def main():
     _key = 'x'
     _title = " System Monitor "
     _footer = "Press Q to exit"
-    cpu_list = []
+    params = {}
 
     try:
         global colors
@@ -172,10 +185,9 @@ def main():
 
             if te.is_set():
                 te.clear()
-                cpu_list = psutil.cpu_times_percent(percpu=True)
+                params = get_params()
 
-            cpu_info(win, cpu_list)
-            #print_mem_info()
+            system_info(win, params)
 
             _key = win.getch()
 
