@@ -107,7 +107,7 @@ def system_info(win, params):
             win.addstr(start_y+1, start_x+1+len(part1), part2, colors['Red'])
             win.addstr(start_y+1, start_x+1+len(part1+part2), part3, colors['Red'])
         else:
-            win.addstr(start_y+1, start_x+1+len(part1), part2, colors['Yellow'])
+            win.addstr(start_y+1, start_x+1+len(part1), part2, colors['White'])
             win.addstr(start_y+1, start_x+1+len(part1+part2), part3, colors['Yellow'])
         start_y += 1
 
@@ -127,6 +127,11 @@ def system_info(win, params):
     part2 = params.get('Uptime')
     win.addstr(start_y+2, start_x+1, part1, colors['Cyan'])
     win.addstr(start_y+2, start_x+1+len(part1), part2[:int(_width/2)-len(part1)-2], colors['White'])
+
+    part1 = 'Free Space: '
+    part2 = str(round(params.get('FreeSpace'), 2)) + 'Gb'
+    win.addstr(start_y+3, start_x+1, part1, colors['Cyan'])
+    win.addstr(start_y+3, start_x+1+len(part1), part2[:int(_width/2)-len(part1)-2], colors['White'])
 
     win.refresh()
 
@@ -175,7 +180,8 @@ def get_params():
         'CPU Usage': psutil.cpu_times_percent()[0],
         'Used Mem': psutil.virtual_memory().percent + 10,
         'Used Swp': psutil.swap_memory().percent,
-        'Uptime': get_uptime()
+        'Uptime': get_uptime(),
+        'FreeSpace': psutil.disk_usage('/')[2]/1000/1000/1000
     }
 
 
@@ -206,7 +212,7 @@ def main():
         cpu.start()
 
         # Main cycle
-        while _key != ord('q'):
+        while _key not in [ord('q'), ord('Q')]:
             win.erase()
             win.border(0)
             # Calculate coordinates for title and footer
@@ -224,7 +230,6 @@ def main():
             system_info(win, params)
 
             _key = win.getch()
-
     finally:
         clearwindow(win)
 
